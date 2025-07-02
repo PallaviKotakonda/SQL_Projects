@@ -256,6 +256,151 @@ group by destination_airport
 order by distance_flown desc limit 5; --top 5 destination airports by total distance flown
 
 -- Q48: Calculate the percentage of flights with any delay type.
---Using case whne
+--Using case when
 SELECT ROUND(COUNT(case when arrival_delay + weather_delay + carrier_delay +late_aircraft_delay + air_traffic_delay + security_delay>0 then 1 end)*100/count(*),2) as percentage_delayed_flights
 from tutorial.flights;
+
+-- Q49: List flights with a wheels-off time after scheduled departure.
+SELECT *
+from tutorial.flights 
+where wheels_off_time > scheduled_departure_time;   -- wheels off time after scheduled departure
+
+-- Q50: Find flights with the same origin and destination city.
+SELECT *
+FROM tutorial.flights 
+where origin_city = destination_city;      --same origin and destination city
+
+-- Q51: Calculate the total air traffic delay by destination state.
+SELECT destination_state , sum(air_traffic_delay) as total_air_traffic_delay
+FROM tutorial.flights 
+group by destination_state;
+
+-- Q52: List flights with a flight number divisible by 2.
+SELECT *
+FROM tutorial.flights 
+where MOD(flight_number::INTEGER, 2) =0;   --flight number divisible by 2 and converting flight_number to integer
+
+-- Q53: Find flights with a departure delay greater than the average departure delay.
+--Using sub query
+SELECT * 
+from tutorial.flights 
+where departure_delay > (SELECT avg(departure_delay) from tutorial.flights); -- departure delay greater than average departure delay
+
+-- Q54: Calculate the minimum actual flight time per origin airport.
+SELECT origin_airport , min(actual_flight_time) as min_actual_flight_time -- minimum actual flight time
+from tutorial.flights
+GROUP by origin_airport;-- per origin airport
+
+-- Q55: List flights with a wheels-on time before actual arrival time.
+SELECT *
+FROM tutorial.flights 
+where wheels_on_time < actual_arrival_time;     -- wheels on time before actual arrival time
+
+-- Q56: Find flights with a distance less than the average distance.
+SELECT * 
+from tutorial.flights 
+where distance < (SELECT avg(distance) from tutorial.flights);  --distance less than average distance
+
+-- Q57: Calculate the total carrier delay by origin city.
+SELECT origin_city , sum(carrier_delay) as total_carrier_delay
+from tutorial.flights 
+group by origin_city;     -- total carrier delay by origin city
+
+-- Q58: List flights with a scheduled flight time greater than 3 hours.
+SELECT * 
+from tutorial.flights
+where scheduled_flight_time >180; --scheduled flight time greater than 3 hours (180 mins)
+
+-- Q59: Rank flights by arrival delay within each origin airport.
+SELECT flight_number, arrival_delay, origin_airport , 
+DENSE_RANK() OVER(PARTITION by origin_airport order by arrival_delay) as delay_rank   --rank by arrival delay within each origin airport
+from tutorial.flights;
+
+-- Q60: Calculate the running total of flight distances by flight number
+SELECT flight_number, distance,
+sum(distance) over 
+  (PARTITION by flight_number 
+  order by distance                       --ensures distance are added in an order
+  ROWS BETWEEN Unbounded preceding and CURRENT ROW) as running_total_flight_distance --running total distance is cummulative distance
+ FROM tutorial.flights 
+
+-- Q61: Find the top 3 flights by departure delay per destination state.
+--Using Windows function and sub query
+ SELECT flight_number , destination_state, departure_delay , top_flights
+ FROM
+ (SELECT * , RANK()
+    OVER(PARTITION by destination_state order by departure_delay) as top_flights  -- ranking flights by destination state and order by departure delay
+    FROM tutorial.flights 
+    where departure_delay is not null ) as ranked    --consider only not null 
+ where top_flights<=3  --filtering only top 3
+
+--62Calculate the average arrival delay for flights departing within 1 hour of each flight.
+--Using self join
+SELECT f1.flight_number, f1.acutal_departure_time,f1.arrival_delay, AVG(f2.arrival_delay)
+FROM tutorial.flights as f1
+join tutorial.flights  as f2 on f2.acutal_departure_time BETWEEN f1.acutal_departure_time AND f1.acutal_departure_time + 60   --flights departing within 1 hour of each flight
+group BY f1.flight_number,f1.acutal_departure_time,f1.arrival_delay,
+ORDER BY f1.acutal_departure_time;
+
+-- Q63: Find flights with above-average arrival delays for their origin airport.
+--Using CTE and Joins
+with Avg_delay_origin_airport as(                -- cte for average arrival delay per origin airport
+SELECT origin_airport , avg(arrival_delay) as avg_arrival_delay
+FROM tutorial.flights 
+group by origin_airport)
+SELECT flight_number,arrival_delay, f1.origin_airport , f2.origin_airport , f2.avg_arrival_delay
+from tutorial.flights as f1
+left join Avg_delay_origin_airport as f2 on f1.origin_airport = f2.origin_airport         -- using left join on origin airpot
+where arrival_delay > avg_arrival_delay   -- filtering flights above average arrival delay 
+
+-- Q64: Calculate the percentage contribution of each flight’s distance to the total distance
+--Using CTE and Joins
+with total_distance as (
+SELECT flight_number, sum(distance)  as total_distance from tutorial.flights group by flight_number) -- total distance per each flight
+SELECT f1.flight_number , f1.distance , f2.total_distance, ROUND((distance*100/ f2.total_distance):: NUMERIC,2) as percentage_distance    -- calculating percentage contribution of each flight
+FROM tutorial.flights  as f1
+left join total_distance as f2 on f1.flight_number = f2.flight_number 
+order by f1.flight_number
+
+-- Q65: Find the 5th longest flight by actual flight time
+SELECT *
+FROM (
+ SELECT * ,RANK() OVER (ORDER BY actual_flight_time DESC) as ranked           --ranking the flights using actual flight time 
+ FROM tutorial.flights  where actual_flight_time is not NULL) ranked_flight
+where ranked = 5;    -- 5th longest flight 
+
+-- Q66: List flights with consecutive departure times within 30 minutes from the same airport.
+SELECT f1.flight_number as flight_1, f1.origin_airport as Airport_flight_1 ,
+f2.flight_number as flight_2, f2.origin_airport as Airport_fight_2 , 
+f1.acutal_departure_time as flight_1_departure , f2.acutal_departure_time as flight_2_departure ,
+(f2.acutal_departure_time - f1.acutal_departure_time) as Diff_departure
+FROM tutorial.flights f1
+join tutorial.flights f2 on f2.origin_airport = f1.origin_airport          --departure from the same airport
+where f1.acutal_departure_time < f2.acutal_departure_time  
+AND (f2.acutal_departure_time - f1.acutal_departure_time) >0 and (f2.acutal_departure_time - f1.acutal_departure_time) <=30  --consecutive departure times within 30 minutes
+order by f1.origin_airport; 
+
+-- Q67: Calculate the month-over-month delay trend (assuming more data).
+--Using CTE and window function
+with month_delay as --total delay per month
+(select EXTRACT(MONTH from day) as month  ,  SUM(( arrival_delay + departure_delay)) as total_delay 
+from tutorial.flights
+group by month)
+SELECT month , total_delay , (total_delay-lag(total_delay) over(order by month)) as month_over_month_trend  --month_over_month trend using lag window function
+from month_delay 
+ORDER by month;
+
+-- Q68: Rank flights by distance within each destination city.
+SELECT flight_number, destination_city ,distance,
+RANK() over(PARTITION by destination_city order by distance DESC) as flight_rank  --ranking flights by distance within each destination city
+FROM tutorial.flights;
+
+-- Q69: Calculate the cumulative arrival delay by origin airport.
+Select origin_airport , day ,       --cumulative arrival delay 
+SUM(arrival_delay) OVER (PARTITION by origin_airport order by day ROWS BETWEEN Unbounded preceding and CURRENT ROW) as Cummulative_arrival_delay
+FROM tutorial.flights;
+
+-- Q70: Find flights with the highest departure delay in each origin state.
+
+
+
