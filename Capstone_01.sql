@@ -437,4 +437,31 @@ FROM
   where scheduled_flight_time is not null) as ranked
 where order_flights = 3;
 
+-- Q74: Calculate the difference in arrival delay from the previous flight at the same airport
+SELECT flight_number,
+ actual_arrival_time,
+ arrival_delay, 
+ (arrival_delay - LAG(arrival_delay) OVER(PARTITION by destination_airport order by actual_arrival_time)) as difference_arrival_time   -- differnce in arrival delay from previous flight 
+FROM tutorial.flights;
+
+-- Q75: List flights with the top 10% of distances.
+Select  flight_number , distance 
+FROM
+(Select flight_number , distance , NTILE(10) OVER(PARTITION by flight_number order by distance desc) as percentile_distance   --10% of diatnce
+FROM tutorial.flights 
+where distance is not null ) as ranked
+where percentile_distance = 1;  --flitering top 10% of distance
+
+-- Q76: Calculate the median departure delay (approximate).
+select departure_delay , median_departure
+FROM
+(select departure_delay, NTILE(2) OVER(order by departure_delay)  as median_departure    
+FROM tutorial.flights
+where departure_delay is NOT NULL) as ranked
+where median_departure = 2    -- filtering the median
+limit 1;
+
+-- Q77: Find flights with a rank in the top 5 by air time per origin city.
+
+
 
