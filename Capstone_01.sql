@@ -401,6 +401,40 @@ SUM(arrival_delay) OVER (PARTITION by origin_airport order by day ROWS BETWEEN U
 FROM tutorial.flights;
 
 -- Q70: Find flights with the highest departure delay in each origin state.
+--Using subquery and windows function
+SELECT flight_number , origin_state , departure_delay
+FROM
+(SELECT flight_number , origin_state ,departure_delay,RANK() OVER(PARTITION by origin_state order by departure_delay DESC) as highest_depature_delay
+FROM tutorial.flights
+where departure_delay is not NULL) as delay
+where highest_depature_delay = 1 ;                   -- highest departure delay 
 
+-- Q71: Calculate the moving average of air time for the last 5 flights.
+--Using window function
+SELECT flight_number, air_time,DAY, 
+AVG(air_time) OVER(PARTITION by flight_number order by day DESC ROWs BETWEEN 4 Preceding and CURRENT ROW) as moving_avg_air_time    -- average of air time for the last 5 flights
+FROM tutorial.flights 
+order by flight_number asc , day DESC;
+
+-- Q72: List flights with below-average distance for their destination airport.
+--Using cte and joins
+With avg_distance_destination_airport as                          -- average distance for each destination airport 
+  (SELECT destination_airport, AVG(distance) as avg_distance
+   FROM tutorial.flights 
+   GROUP by destination_airport)
+SELECT T1.flight_number , T1.distance , T2.avg_distance 
+  FROM tutorial.flights T1
+  join avg_distance_destination_airport T2
+  on T1.destination_airport = T2.destination_airport
+  where T1.distance < T2.avg_distance;   --flitering flights below average distance for their destination airport
+
+-- Q73: Find the 3rd shortest flight by scheduled flight time.
+--Using SubQuery and window function
+SELECT * 
+FROM
+  (Select * , RANK() OVER (ORDER by scheduled_flight_time ASC) as order_flights
+  from tutorial.flights
+  where scheduled_flight_time is not null) as ranked
+where order_flights = 3;
 
 
