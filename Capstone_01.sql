@@ -462,6 +462,15 @@ where median_departure = 2    -- filtering the median
 limit 1;
 
 -- Q77: Find flights with a rank in the top 5 by air time per origin city.
+--Using subquery and window function
+Select flight_number , origin_city, air_time , air_time_rank
+FROM
+ (Select flight_number, origin_city,air_time, 
+  RANK() OVER(PARTITION by origin_city order by air_time DESC) as air_time_rank      -- ranking flights by air time per origin city  
+  from tutorial.flights 
+  where air_time is not NULL) as ranked
+WHERE air_time_rank <=5;  --filtering top 5 
+
 
 
 
