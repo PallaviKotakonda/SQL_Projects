@@ -1,1 +1,6 @@
+-- CASE STUDY 3 
+-- Platform used: mode.com 
+-- Table used: tutorial.crunchbase_companies
+-- Date: 24th June'25
 
+--Q1.Find the top 5 countries(country code) with the highest number of operating companies. Ensure the country code is not null. 
